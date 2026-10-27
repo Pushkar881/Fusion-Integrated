@@ -14,6 +14,7 @@ from modules.leave.models import (
     LeaveLedgerEntry,
 )
 from modules.leave.domain.categories import is_eligible_for_category
+from modules.leave.domain.exceptions import InvalidLeaveCalculation
 from modules.leave.domain.counting import calculate_leave_days
 from modules.leave.selectors.applications import get_active_overlapping_leaves
 from modules.leave.selectors.balances import get_or_create_balance
@@ -48,8 +49,11 @@ def record_offline_leave(
     holidays = HolidayCalendar.objects.filter(year=start_date.year, is_published=True)
     closed_dates = {row.date for row in holidays if row.kind == "closed"}
     rh_dates = {row.date for row in holidays if row.kind == "restricted"}
-    expected_days = calculate_leave_days(category, start_date, end_date,
-                                         closed_holidays=closed_dates, rh_holidays=rh_dates)
+    try:
+        expected_days = calculate_leave_days(category, start_date, end_date,
+                                             closed_holidays=closed_dates, rh_holidays=rh_dates)
+    except InvalidLeaveCalculation as exc:
+        raise BadRequestError(str(exc), code="invalid_leave_calculation")
     if expected_days != days_count:
         raise BadRequestError("Entered leave days do not match the configured calendar calculation.", code="invalid_days_count")
     if get_active_overlapping_leaves(employee_user_id, start_date, end_date).exists():

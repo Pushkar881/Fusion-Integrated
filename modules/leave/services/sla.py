@@ -8,6 +8,9 @@ from modules.leave.services.notifications import enqueue as enqueue_notification
 def _setting(key: str, default: int) -> int:
     row = LeavePolicyConfig.objects.filter(key=key).first()
     try:
+        if row and isinstance(row.value, dict):
+            val = row.value.get("hours", row.value.get("value", default))
+            return max(1, int(val))
         return max(1, int(row.value)) if row else default
     except (TypeError, ValueError):
         return default
@@ -36,7 +39,10 @@ def process_sla_thresholds(*, now=None) -> dict[str, int]:
     escalation_user_id = None
     if escalation_cfg:
         try:
-            escalation_user_id = int(escalation_cfg.value)
+            if isinstance(escalation_cfg.value, dict):
+                escalation_user_id = int(escalation_cfg.value.get("user_id", escalation_cfg.value.get("value", 0)))
+            else:
+                escalation_user_id = int(escalation_cfg.value)
         except (TypeError, ValueError):
             escalation_user_id = None
 

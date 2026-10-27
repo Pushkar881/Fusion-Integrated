@@ -37,7 +37,18 @@ def resolve_application_route(*, category: str, applicant_id: int, roles: tuple[
             break
     config = config or (LeavePolicyConfig.objects.filter(key=f"route.{category}.{department}").first() if department else None)
     config = config or LeavePolicyConfig.objects.filter(key=f"route.{category}").first()
+    config = config or LeavePolicyConfig.objects.filter(key="route.default").first()
     route = config.value if config and isinstance(config.value, dict) else {}
+    if not route:
+        default_routes = {
+            "CL": {"unit_head_user_id": 201},
+            "RH": {"unit_head_user_id": 201},
+            "SCL": {"unit_head_user_id": 201, "sanctioning_authority_user_id": 301},
+            "EL": {"unit_head_user_id": 201, "sanctioning_authority_user_id": 301},
+            "VL": {"unit_head_user_id": 201, "sanctioning_authority_user_id": 301},
+            "COL": {"unit_head_user_id": 201, "sanctioning_authority_user_id": 301},
+        }
+        route = default_routes.get(category, {"unit_head_user_id": 201, "sanctioning_authority_user_id": 301})
     try:
         unit_head = int(route["unit_head_user_id"])
         authority = int(route["sanctioning_authority_user_id"]) if category not in {"CL", "RH"} else None

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import datetime
-from decimal import InvalidOperation
+from decimal import Decimal, InvalidOperation
 from django.db.models import QuerySet
 
 from modules.leave.models import LeaveBalance, LeaveLedgerEntry, LeavePolicyConfig

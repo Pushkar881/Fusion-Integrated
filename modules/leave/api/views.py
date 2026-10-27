@@ -493,13 +493,15 @@ class LeaveConfigurationView(APIView):
                 raise BadRequestError("Entitlements must be numeric day values.", code="invalid_entitlements")
         if key in {"sla.reminder_hours", "sla.escalation_hours"}:
             try:
-                if int(value) < 1:
+                raw = value.get("hours", value.get("value", value)) if isinstance(value, dict) else value
+                if int(raw) < 1:
                     raise ValueError
             except (TypeError, ValueError):
                 raise BadRequestError("SLA thresholds must be positive whole hours.", code="invalid_sla_threshold")
         if key == "sla.escalation_user_id":
             try:
-                if int(value) < 1:
+                raw = value.get("user_id", value.get("value", value)) if isinstance(value, dict) else value
+                if int(raw) < 1:
                     raise ValueError
             except (TypeError, ValueError):
                 raise BadRequestError("Escalation authority must be a positive user ID.", code="invalid_sla_authority")
@@ -507,7 +509,9 @@ class LeaveConfigurationView(APIView):
             key=key, defaults={"value": value,
                                "description": serializer.validated_data["description"]},
         )
-        return Response({"key": config.key, "value": config.value, "description": config.description})
+        return Response({"status": "updated", "key": config.key, "value": config.value, "description": config.description})
+
+    post = put
 
 
 class VacationPeriodsSyncView(APIView):

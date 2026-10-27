@@ -5,7 +5,7 @@ import datetime
 from decimal import Decimal
 from typing import Set
 
-from core.api.exceptions import BadRequestError
+from modules.leave.domain.exceptions import InvalidLeaveCalculation
 from modules.leave.domain.categories import (
     CL,
     CONTINUOUS_COUNT_CATEGORIES,
@@ -30,13 +30,13 @@ def calculate_leave_days(
     BR-EL-003: RH must correspond to an applicable Restricted Holiday in the calendar.
     """
     if end_date < start_date:
-        raise BadRequestError("End date cannot be earlier than start date.", code="invalid_dates")
+        raise InvalidLeaveCalculation("End date cannot be earlier than start date.")
 
     if half_day_type in ("first_half", "second_half"):
         if category != CL:
-            raise BadRequestError("Half-day leave is only permitted for Casual Leave (CL).", code="half_day_not_cl")
+            raise InvalidLeaveCalculation("Half-day leave is only permitted for Casual Leave (CL).")
         if start_date != end_date:
-            raise BadRequestError("Half-day leave must start and end on the same single date.", code="half_day_single_day")
+            raise InvalidLeaveCalculation("Half-day leave must start and end on the same single date.")
         return Decimal("0.5")
 
     if category in CONTINUOUS_COUNT_CATEGORIES:
@@ -61,18 +61,16 @@ def calculate_leave_days(
     if category == RH:
         rh_holidays = rh_holidays or set()
         if start_date != end_date:
-            raise BadRequestError("Restricted Holiday must be taken 1 day at a time.", code="rh_single_day")
+            raise InvalidLeaveCalculation("Restricted Holiday must be taken 1 day at a time.")
         if start_date not in rh_holidays:
-            raise BadRequestError(
-                f"Date {start_date} is not listed as an active Restricted Holiday (RH).",
-                code="not_a_restricted_holiday",
+            raise InvalidLeaveCalculation(
+                f"Date {start_date} is not listed as an active Restricted Holiday (RH)."
             )
         return Decimal("1.0")
 
     if total_days == 0:
-        raise BadRequestError(
-            "Selected dates fall entirely on weekends or closed holidays.",
-            code="zero_deductible_days",
+        raise InvalidLeaveCalculation(
+            "Selected dates fall entirely on weekends or closed holidays."
         )
 
     return Decimal(str(total_days))

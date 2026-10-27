@@ -1,7 +1,7 @@
 """Declarative state machine for leave workflows (WF-EL-01..05)."""
 from __future__ import annotations
 
-from core.api.exceptions import ConflictError
+from modules.leave.domain.exceptions import InvalidStateTransition
 
 DRAFT = "draft"
 SUBMITUTE_PENDING = "substitute_pending"
@@ -32,7 +32,6 @@ def validate_transition(current_state: str, next_state: str) -> None:
     """Ensure the state transition is valid per business rules."""
     allowed = ALLOWED_TRANSITIONS.get(current_state, set())
     if next_state not in allowed:
-        raise ConflictError(
-            f"Cannot transition leave application from {current_state!r} to {next_state!r}.",
-            code="invalid_state_transition",
+        raise InvalidStateTransition(
+            f"Cannot transition leave application from {current_state!r} to {next_state!r}."
         )

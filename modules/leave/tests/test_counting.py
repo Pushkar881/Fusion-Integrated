@@ -3,7 +3,7 @@ import datetime
 from decimal import Decimal
 import pytest
 
-from core.api.exceptions import BadRequestError
+from modules.leave.domain.exceptions import InvalidLeaveCalculation
 from modules.leave.domain.counting import calculate_leave_days
 
 
@@ -15,7 +15,7 @@ def test_cl_half_day():
 
 def test_half_day_not_allowed_for_el():
     d = datetime.date(2026, 10, 12)
-    with pytest.raises(BadRequestError):
+    with pytest.raises(InvalidLeaveCalculation):
         calculate_leave_days("EL", d, d, half_day_type="first_half")
 
 
@@ -42,5 +42,5 @@ def test_rh_must_match_calendar():
     assert days == Decimal("1.0")
 
     # Invalid non-RH date
-    with pytest.raises(BadRequestError):
+    with pytest.raises(InvalidLeaveCalculation):
         calculate_leave_days("RH", rh_date, rh_date, rh_holidays=set())

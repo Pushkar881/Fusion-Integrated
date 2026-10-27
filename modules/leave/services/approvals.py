@@ -191,9 +191,10 @@ def process_cancellation_decision(
     if app.status != "cancel_requested":
         raise ConflictError("Application is not in cancellation requested status.", code="not_cancel_requested")
 
+    original = app.parent_leave or app
+
     if decision == "approved":
         # A cancellation is a separate request row; restore the original approved leave.
-        original = app.parent_leave or app
         balance = get_or_create_balance(original.user_id, original.start_date.year)
         balance.credit(original.category, original.days_count)
         balance.save()

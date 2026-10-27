@@ -1,6 +1,6 @@
 """Unit tests for leave state machine transitions."""
 import pytest
-from core.api.exceptions import ConflictError
+from modules.leave.domain.exceptions import InvalidStateTransition
 from modules.leave.domain.state_machine import validate_transition
 
 
@@ -15,8 +15,8 @@ def test_valid_transitions():
 
 
 def test_invalid_transitions():
-    with pytest.raises(ConflictError):
+    with pytest.raises(InvalidStateTransition):
         validate_transition("draft", "approved")  # Cannot skip review
 
-    with pytest.raises(ConflictError):
+    with pytest.raises(InvalidStateTransition):
         validate_transition("closed", "approved")  # Terminal state

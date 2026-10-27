@@ -7,6 +7,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from core.api.exceptions import BadRequestError, ConflictError
+from modules.leave.domain.exceptions import InvalidLeaveCalculation
 from modules.leave.domain.counting import calculate_leave_days
 from modules.leave.models import (
     HolidayCalendar,
@@ -35,6 +36,8 @@ def submit_resumption_declaration(
         raise ConflictError("Resumption has already been reviewed for this leave.", code="resumption_already_reviewed")
     if app.category not in {"EL", "COL", "VL"}:
         raise BadRequestError("Formal resumption review applies only to EL, COL, and VL.", code="resumption_not_applicable")
+    if resumption_date < app.start_date:
+        raise BadRequestError("Resumption date cannot be earlier than leave start date.", code="invalid_resumption_date")
 
     app.resumption_date = resumption_date
     app.resumption_remarks = remarks
@@ -78,12 +81,15 @@ def review_resumption_declaration(
     # Recalculate days count
     holidays = HolidayCalendar.objects.filter(year=app.start_date.year, is_published=True)
     closed_dates = {h.date for h in holidays if h.kind == "closed"}
-    actual_days = calculate_leave_days(
-        category=app.category,
-        start_date=app.start_date,
-        end_date=actual_end_date,
-        closed_holidays=closed_dates,
-    )
+    try:
+        actual_days = calculate_leave_days(
+            category=app.category,
+            start_date=app.start_date,
+            end_date=actual_end_date,
+            closed_holidays=closed_dates,
+        )
+    except InvalidLeaveCalculation as exc:
+        raise BadRequestError(str(exc), code="invalid_leave_calculation")
 
     days_diff = Decimal("0.0") if app.resumption_date == app.end_date else app.days_count - actual_days
     if days_diff > Decimal("0.0"):
@@ -116,9 +122,10 @@ def review_resumption_declaration(
             remarks=f"Late resumption on {app.resumption_date}: deducted additional {extra} days",
         )
 
+    app.status = "closed"
     app.actual_days_count = actual_days
     app.resumption_reviewed_at = timezone.now()
-    app.save(update_fields=["actual_days_count", "resumption_reviewed_at", "updated_at"])
+    app.save(update_fields=["status", "actual_days_count", "resumption_reviewed_at", "updated_at"])
 
     LeaveActionHistory.objects.create(
         application=app,

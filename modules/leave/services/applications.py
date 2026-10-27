@@ -13,6 +13,7 @@ from modules.leave.domain.categories import (
     CONTINUOUS_COUNT_CATEGORIES,
     is_eligible_for_category,
 )
+from modules.leave.domain.exceptions import InvalidLeaveCalculation, InvalidStateTransition
 from modules.leave.domain.counting import calculate_leave_days
 from modules.leave.domain.state_machine import validate_transition
 from modules.leave.models import (
@@ -87,14 +88,17 @@ def apply_for_leave(
     closed_dates = {h.date for h in holidays if h.kind == "closed"}
     rh_dates = {h.date for h in holidays if h.kind == "restricted"}
 
-    days_count = calculate_leave_days(
-        category=category,
-        start_date=start_date,
-        end_date=end_date,
-        half_day_type=half_day_type,
-        closed_holidays=closed_dates,
-        rh_holidays=rh_dates,
-    )
+    try:
+        days_count = calculate_leave_days(
+            category=category,
+            start_date=start_date,
+            end_date=end_date,
+            half_day_type=half_day_type,
+            closed_holidays=closed_dates,
+            rh_holidays=rh_dates,
+        )
+    except InvalidLeaveCalculation as exc:
+        raise BadRequestError(str(exc), code="invalid_leave_calculation")
 
     # Balance check
     balance = get_or_create_balance(user_id, start_date.year, is_faculty=is_faculty)
@@ -192,7 +196,10 @@ def withdraw_application(*, user_id: int, application_id: int, reason: str = "")
             code="cannot_withdraw",
         )
 
-    validate_transition(app.status, "withdrawn")
+    try:
+        validate_transition(app.status, "withdrawn")
+    except InvalidStateTransition as exc:
+        raise ConflictError(str(exc), code="invalid_state_transition")
     app.status = "withdrawn"
     app.save(update_fields=["status", "updated_at"])
 
@@ -229,7 +236,10 @@ def request_cancellation(*, user_id: int, application_id: int, reason: str) -> L
             code="leave_already_started",
         )
 
-    validate_transition(app.status, "cancel_requested")
+    try:
+        validate_transition(app.status, "cancel_requested")
+    except InvalidStateTransition as exc:
+        raise ConflictError(str(exc), code="invalid_state_transition")
     cancellation = LeaveApplication.objects.create(
         user_id=app.user_id, category=app.category, start_date=app.start_date,
         end_date=app.end_date, half_day_type=app.half_day_type, days_count=Decimal("0.0"),
